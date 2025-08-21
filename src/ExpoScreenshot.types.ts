@@ -1,3 +1,3 @@
 export type ScreenshotOptions = {
-  output?: "file" | "base64" | "data-uri";
+  output?: "file" | "base64" | "dataUri";
 };

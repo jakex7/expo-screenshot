@@ -1,7 +1,7 @@
 {
   "name": "expo-screenshot",
-  "version": "0.1.0",
-  "description": "Capture Views",
+  "version": "0.0.1",
+  "description": "Capture screenshots of React Native views",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "scripts": {
