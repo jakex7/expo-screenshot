@@ -1,50 +1,71 @@
 package expo.modules.screenshot
 
+import android.graphics.Bitmap
+import android.graphics.Rect
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.util.Base64
+import android.view.PixelCopy
+import android.view.View
+import androidx.annotation.RequiresApi
+import androidx.core.graphics.createBitmap
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
-import java.net.URL
+import java.io.ByteArrayOutputStream
 
 class ExpoScreenshotModule : Module() {
-  // Each module class must implement the definition function. The definition consists of components
-  // that describes the module's functionality and behavior.
-  // See https://docs.expo.dev/modules/module-api for more details about available components.
-  override fun definition() = ModuleDefinition {
-    // Sets the name of the module that JavaScript code will use to refer to the module. Takes a string as an argument.
-    // Can be inferred from module's class name, but it's recommended to set it explicitly for clarity.
-    // The module will be accessible from `requireNativeModule('ExpoScreenshot')` in JavaScript.
-    Name("ExpoScreenshot")
+    @RequiresApi(Build.VERSION_CODES.O)
+    override fun definition() = ModuleDefinition {
+        Name("ExpoScreenshot")
 
-    // Sets constant properties on the module. Can take a dictionary or a closure that returns a dictionary.
-    Constants(
-      "PI" to Math.PI
-    )
+        AsyncFunction("makeScreenshot") { viewTag: Int, screenshotOptions: ScreenshotOptions?, promise: Promise ->
+            val options = screenshotOptions ?: ScreenshotOptions()
+            val activity = appContext.throwingActivity
 
-    // Defines event names that the module can send to JavaScript.
-    Events("onChange")
+            val view = getViewByTag(viewTag)
+            val viewRect = getViewRect(view)
 
-    // Defines a JavaScript synchronous function that runs the native code on the JavaScript thread.
-    Function("hello") {
-      "Hello world! 👋"
+            val bitmap = createBitmap(viewRect.width(), viewRect.height(), Bitmap.Config.ARGB_8888)
+            PixelCopy.request(
+                activity.window, viewRect, bitmap,
+                { copyResult ->
+                    if (copyResult == PixelCopy.SUCCESS) {
+                        promise.resolve(getResultsFromBitmap(bitmap, options))
+                    } else {
+                        throw TakingScreenshotException()
+                    }
+                    bitmap.recycle()
+                },
+                Handler(Looper.getMainLooper())
+            )
+        }
     }
 
-    // Defines a JavaScript function that always returns a Promise and whose native code
-    // is by default dispatched on the different thread than the JavaScript runtime runs on.
-    AsyncFunction("setValueAsync") { value: String ->
-      // Send an event to JavaScript.
-      sendEvent("onChange", mapOf(
-        "value" to value
-      ))
+    private fun getViewByTag(viewTag: Int): View {
+        val activity = appContext.throwingActivity
+        return activity.findViewById(viewTag) ?: throw ViewNotFoundException(viewTag)
     }
 
-    // Enables the module to be used as a native view. Definition components that are accepted as part of
-    // the view definition: Prop, Events.
-    View(ExpoScreenshotView::class) {
-      // Defines a setter for the `url` prop.
-      Prop("url") { view: ExpoScreenshotView, url: URL ->
-        view.webView.loadUrl(url.toString())
-      }
-      // Defines an event that the view can send to JavaScript.
-      Events("onLoad")
+    private fun getViewRect(view: View): Rect {
+        val rect = Rect()
+        view.getGlobalVisibleRect(rect)
+        return rect
     }
-  }
+
+    private fun getResultsFromBitmap(bitmap: Bitmap, options: ScreenshotOptions): String {
+        return when (options.output) {
+            Output.BASE64 -> bitmapToBase64(bitmap)
+            Output.DATA_URI -> "data:image/png;base64," + bitmapToBase64(bitmap)
+            else -> throw UnsupportedOutputException(options.output)
+        }
+    }
+
+    private fun bitmapToBase64(bitmap: Bitmap): String {
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+        val byteArray = byteArrayOutputStream.toByteArray()
+        return Base64.encodeToString(byteArray, Base64.NO_WRAP)
+    }
 }

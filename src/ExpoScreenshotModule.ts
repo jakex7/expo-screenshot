@@ -1,12 +1,9 @@
-import { NativeModule, requireNativeModule } from 'expo';
+import { requireNativeModule } from "expo";
+import { ScreenshotOptions } from "./ExpoScreenshot.types";
 
-import { ExpoScreenshotModuleEvents } from './ExpoScreenshot.types';
-
-declare class ExpoScreenshotModule extends NativeModule<ExpoScreenshotModuleEvents> {
-  PI: number;
-  hello(): string;
-  setValueAsync(value: string): Promise<void>;
+declare class ExpoScreenshotModule {
+  makeScreenshot(viewTag: number, options?: ScreenshotOptions): Promise<string>;
 }
 
 // This call loads the native module object from the JSI.
-export default requireNativeModule<ExpoScreenshotModule>('ExpoScreenshot');
+export default requireNativeModule<ExpoScreenshotModule>("ExpoScreenshot");
