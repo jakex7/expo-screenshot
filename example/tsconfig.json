@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "expo-screenshot": ["../src/index"],
+      "expo-screenshot/*": ["../src/*"]
+    }
+  }
+}
