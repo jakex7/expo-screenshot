@@ -12,7 +12,7 @@ export const makeScreenshot = (
   const viewTag = findNodeHandle(ref.current);
   if (!viewTag) throw new Error("Failed to find the view tag");
 
-  return ExpoScreenshotModule.makeScreenshot(viewTag, options);
+  return ExpoScreenshotModule.makeScreenshot(viewTag, options || {});
 };
 
 export default {

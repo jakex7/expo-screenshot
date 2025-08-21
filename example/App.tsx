@@ -48,7 +48,12 @@ export default function App() {
               justifyContent: "center",
               alignItems: "center",
             }}
+            collapsable={false}
           >
+            <View
+              style={{ width: 50, height: 50, backgroundColor: "blue" }}
+              collapsable={false}
+            />
             <Text>Test view content</Text>
           </View>
         </Group>

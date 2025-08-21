@@ -1,48 +1,67 @@
 import ExpoModulesCore
 
 public class ExpoScreenshotModule: Module {
-  // Each module class must implement the definition function. The definition consists of components
-  // that describes the module's functionality and behavior.
-  // See https://docs.expo.dev/modules/module-api for more details about available components.
   public func definition() -> ModuleDefinition {
-    // Sets the name of the module that JavaScript code will use to refer to the module. Takes a string as an argument.
-    // Can be inferred from module's class name, but it's recommended to set it explicitly for clarity.
-    // The module will be accessible from `requireNativeModule('ExpoScreenshot')` in JavaScript.
     Name("ExpoScreenshot")
 
-    // Sets constant properties on the module. Can take a dictionary or a closure that returns a dictionary.
-    Constants([
-      "PI": Double.pi
-    ])
-
-    // Defines event names that the module can send to JavaScript.
-    Events("onChange")
-
-    // Defines a JavaScript synchronous function that runs the native code on the JavaScript thread.
-    Function("hello") {
-      return "Hello world! 👋"
-    }
-
-    // Defines a JavaScript function that always returns a Promise and whose native code
-    // is by default dispatched on the different thread than the JavaScript runtime runs on.
-    AsyncFunction("setValueAsync") { (value: String) in
-      // Send an event to JavaScript.
-      self.sendEvent("onChange", [
-        "value": value
-      ])
-    }
-
-    // Enables the module to be used as a native view. Definition components that are accepted as part of the
-    // view definition: Prop, Events.
-    View(ExpoScreenshotView.self) {
-      // Defines a setter for the `url` prop.
-      Prop("url") { (view: ExpoScreenshotView, url: URL) in
-        if view.webView.url != url {
-          view.webView.load(URLRequest(url: url))
-        }
+    AsyncFunction("makeScreenshot") { (viewTag: Int, options: ScreenshotOptions) in
+      guard let view = appContext?.findView(withTag: viewTag, ofType: UIView.self) else {
+        throw ViewNotFoundException(String(viewTag))
       }
 
-      Events("onLoad")
+      guard let window = view.window else {
+        return try getEmptyImage(options: options)
+      }
+
+      let viewFrameInWindow = view.superview?.convert(view.frame, to: window) ?? view.frame
+      let windowBounds = window.bounds
+      let visibleRect = viewFrameInWindow.intersection(windowBounds)
+
+      if visibleRect.isEmpty {
+        return try getEmptyImage(options: options)
+      }
+
+      let visibleRectInView = view.superview?.convert(visibleRect, from: window) ?? visibleRect
+      let localVisibleRect = CGRect(
+        x: visibleRectInView.origin.x - view.frame.origin.x,
+        y: visibleRectInView.origin.y - view.frame.origin.y,
+        width: visibleRectInView.width,
+        height: visibleRectInView.height
+      )
+      
+      let rendererFormat = UIGraphicsImageRendererFormat()
+      rendererFormat.scale = view.window?.screen.scale ?? UIScreen.main.scale
+
+      let renderer = UIGraphicsImageRenderer(bounds: localVisibleRect, format: rendererFormat)
+      let image = renderer.image { context in
+        // Translate the context to draw only the visible portion
+        context.cgContext.translateBy(x: -localVisibleRect.origin.x, y: -localVisibleRect.origin.y)
+        view.drawHierarchy(in: view.bounds, afterScreenUpdates: false)
+      }
+
+      return try getResultsFromImage(image, options: options)
+    }.runOnQueue(.main)
+  }
+
+  private func getResultsFromImage(_ image: UIImage, options: ScreenshotOptions) throws -> String {
+    guard let imageData = image.pngData() else {
+      throw TakingScreenshotException()
     }
+
+    let base64EncodedString = imageData.base64EncodedString(options: .endLineWithLineFeed)
+
+    switch options.output {
+    case .base64:
+      return base64EncodedString
+    case .dataUri:
+      return "data:image/png;base64," + base64EncodedString
+    case .file:
+      throw UnsupportedOutputException(options.output.rawValue)
+    }
+  }
+
+  private func getEmptyImage(options: ScreenshotOptions) throws -> String {
+    let emptyImage = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1)).image { _ in }
+    return try getResultsFromImage(emptyImage, options: options)
   }
 }

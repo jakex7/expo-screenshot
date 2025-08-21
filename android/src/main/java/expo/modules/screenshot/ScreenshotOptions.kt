@@ -7,7 +7,7 @@ import expo.modules.kotlin.types.Enumerable
 enum class Output(val value: String) : Enumerable {
     FILE("file"),
     BASE64("base64"),
-    DATA_URI("data-uri");
+    DATA_URI("dataUri");
 }
 
 data class ScreenshotOptions(
